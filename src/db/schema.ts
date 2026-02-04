@@ -15,6 +15,10 @@ export const matchStatus = pgEnum("match_status", [
   "finished",
 ]);
 
+
+
+export type MatchStatus = (typeof matchStatus.enumValues)[number];
+
 // Matches table
 export const matches = pgTable("matches", {
   id: serial("id").primaryKey(),
