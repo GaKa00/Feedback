@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
-import * as http from "http";
+import http from "http";
+import { wsArcjet } from "../arcjet";
 
 function sendJson(socket: WebSocket, data: any) {
   if (socket.readyState === WebSocket.OPEN) {
@@ -15,21 +16,43 @@ function broadcast(wss: WebSocketServer, data: any) {
   }
 }
 
-function attachWebSocketServer(server: http.Server) {
+export default function attachWebSocketServer(server: http.Server) {
   const wss = new WebSocketServer({
     server,
     path: "/ws",
     maxPayload: 1024 * 1024,
   });
 
-  wss.on("connection", (socket : WebSocket) => {
-    sendJson(socket, {
-      type: "welcome",
-      message: "Welcome to the WebSocket server!",
-    });
-  });
+  wss.on(
+    "connection",
+    async (socket: WebSocket, req: http.IncomingMessage | undefined) => {
+      if (wsArcjet) {
+        try {
+          const decision = await wsArcjet.protect(req as any, {} as any);
 
-  function broadcastMatchCreated(wss: WebSocketServer, match: any) {
+          if (decision.isDenied()) {
+            const code = decision.reason.isRateLimit() ? 1013 : 1008;
+            const reason = decision.reason.isRateLimit()
+              ? "Rate limit exceeded"
+              : "Forbidden";
+            socket.close(code, reason);
+            return;
+          }
+        } catch (error) {
+          console.error("Arcjet WebSocket error:", error);
+          socket.close(1011, "Internal Server Error");
+          return;
+        }
+      }
+
+      sendJson(socket, {
+        type: "welcome",
+        message: "Welcome to the WebSocket server!",
+      });
+    },
+  );
+
+  function broadcastMatchCreated(match: any) {
     broadcast(wss, { type: "matchCreated", match });
   }
 
