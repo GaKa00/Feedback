@@ -9,19 +9,16 @@ const MatchRouter = Router();
 export default MatchRouter;
 
 MatchRouter.get("/", async (req, res) => {
-
   const rawLimit = Number(req.query.limit);
   const limit =
-    Number.isInteger(rawLimit) && rawLimit > 0
-      ? Math.min(rawLimit, 100) 
-      : 50; 
+    Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
 
   try {
     const data = await db
       .select()
       .from(matches)
       .limit(limit)
-      .orderBy(desc(matches.createdAt)); 
+      .orderBy(desc(matches.createdAt));
 
     res.status(200).json({ matches: data });
   } catch (error) {
@@ -54,9 +51,9 @@ MatchRouter.post("/", async (req, res) => {
       })
       .returning();
 
-      if (req.app.locals.broadcastMatchCreated) {
-        req.app.locals.broadcastMatchCreated(insertedMatch);
-      }
+    if (req.app.locals.broadcastMatchCreated) {
+      req.app.locals.broadcastMatchCreated(insertedMatch);
+    }
 
     res.status(201).json({ match: insertedMatch });
   } catch (error) {

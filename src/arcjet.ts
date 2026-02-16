@@ -1,16 +1,26 @@
+import "dotenv/config";
 import { detectBot, shield } from "@arcjet/node";
 import arcjet, { slidingWindow } from "arcjet";
 
 const arcjetkey = process.env.ARCJET_KEY;
 const arcjetmode = process.env.ARCJET_MODE === "DRY_RUN" ? "DRY_RUN" : "LIVE";
 
-if (!arcjetkey) {
-  throw new Error("ARCJET_KEY is not defined in environment variables");
-}
+// Create a simple logger adapter
+const logger = {
+  error: (message: string) => console.error(`[arcjet] ${message}`),
+  warn: (message: string) => console.warn(`[arcjet] ${message}`),
+  info: (message: string) => console.info(`[arcjet] ${message}`),
+  debug: (message: string) => console.debug(`[arcjet] ${message}`),
+};
 
-export const httpArcjet = arcjetkey
-  ? arcjet({
+let httpArcjetInstance: any = null;
+let wsArcjetInstance: any = null;
+
+if (arcjetkey) {
+  try {
+    httpArcjetInstance = arcjet({
       key: arcjetkey,
+      log: logger as any,
       rules: [
         shield({ mode: arcjetmode }),
         detectBot({
@@ -19,12 +29,11 @@ export const httpArcjet = arcjetkey
         }),
         slidingWindow({ mode: arcjetmode, interval: "10s", max: 50 }),
       ],
-    })
-  : null;
+    });
 
-export const wsArcjet = arcjetkey
-  ? arcjet({
+    wsArcjetInstance = arcjet({
       key: arcjetkey,
+      log: logger as any,
       rules: [
         shield({ mode: arcjetmode }),
         detectBot({
@@ -33,8 +42,18 @@ export const wsArcjet = arcjetkey
         }),
         slidingWindow({ mode: arcjetmode, interval: "2s", max: 5 }),
       ],
-    })
-  : null;
+    });
+  } catch (error) {
+    console.error("Failed to initialize Arcjet:", error);
+  }
+} else {
+  console.warn(
+    "ARCJET_KEY not found in environment variables. Arcjet protection is disabled.",
+  );
+}
+
+export const httpArcjet = httpArcjetInstance;
+export const wsArcjet = wsArcjetInstance;
 
 export async function securityMiddleware(req: any, res: any, next: any) {
   if (!httpArcjet) return next();
